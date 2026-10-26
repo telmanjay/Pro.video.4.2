@@ -1,0 +1,55 @@
+
+name: Build PRO VIDEO 4 diagnostic APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find project ZIP
+        id: project
+        run: |
+          ZIP_FILE="$(find . -maxdepth 2 -type f -iname 'PRO_VIDEO_4*.zip' | head -n 1)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP not found in repository"
+            exit 1
+          fi
+          mkdir -p _source
+          unzip -q "$ZIP_FILE" -d _source
+          PROJECT_DIR="$(find _source -type f -name settings.gradle.kts -printf '%h\n' | head -n 1)"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Android project not found in ZIP"
+            exit 1
+          fi
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build APK
+        run: gradle -p "${{ steps.project.outputs.dir }}" assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PRO-VIDEO-4-diagnostic-debug-apk
+          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
